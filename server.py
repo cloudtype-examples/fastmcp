@@ -42,12 +42,9 @@ def complete_task(task_id: int) -> Dict[str, Any]:
     return tasks_db[task_id]
 
 @mcp.tool
-def list_tasks(completed: bool = None) -> List[Dict[str, Any]]:
-    """List all tasks, optionally filtered by completion status."""
-    tasks = list(tasks_db.values())
-    if completed is not None:
-        tasks = [task for task in tasks if task["completed"] == completed]
-    return tasks
+def list_tasks() -> List[Dict[str, Any]]:
+    """List all tasks."""
+    return list(tasks_db.values())
 
 @mcp.tool
 def health_check() -> Dict[str, Any]:
