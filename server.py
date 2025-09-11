@@ -6,8 +6,38 @@ from datetime import datetime
 from typing import Dict, List, Any
 from fastmcp import FastMCP
 
-# Initialize FastMCP server (auth disabled for now)
+# Initialize FastMCP server
 mcp = FastMCP(name="FastMCPServer")
+
+# Authentication middleware
+def check_auth(request):
+    """Check if the request has valid Bearer token authentication."""
+    auth_token = os.getenv("FASTMCP_AUTH_TOKEN")
+    if not auth_token:
+        return True  # No auth required if token not set
+    
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        from starlette.responses import JSONResponse
+        return JSONResponse({"error": "Missing or invalid Authorization header"}, status_code=401)
+    
+    token = auth_header[7:]  # Remove "Bearer " prefix
+    if token != auth_token:
+        from starlette.responses import JSONResponse
+        return JSONResponse({"error": "Invalid token"}, status_code=401)
+    
+    return True
+
+# Remove unused create_app call
+
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        auth_result = check_auth(request)
+        if auth_result != True:
+            return auth_result
+        return await call_next(request)
 
 # Sample data store
 tasks_db: Dict[int, Dict[str, Any]] = {
@@ -54,7 +84,7 @@ def health_check() -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat(),
         "server": "FastMCP Server",
         "tasks_count": len(tasks_db),
-        "auth_enabled": False
+        "auth_enabled": bool(os.getenv("FASTMCP_AUTH_TOKEN"))
     }
 
 # Resources - Read-only data sources
@@ -106,13 +136,23 @@ def task_planning_prompt(project: str, deadline: str = "no specific deadline") -
 # ASGI 애플리케이션으로 노출 (uvicorn용)
 app = mcp.http_app()
 
+# Add authentication middleware if token is set
+auth_token = os.getenv("FASTMCP_AUTH_TOKEN")
+if auth_token:
+    app.add_middleware(AuthMiddleware)
+
 if __name__ == "__main__":
     import uvicorn
     
     host = os.getenv("FASTMCP_HOST", "0.0.0.0")
     port = int(os.getenv("FASTMCP_PORT", "8000"))
     
+    auth_token = os.getenv("FASTMCP_AUTH_TOKEN")
+    
     print(f"🚀 Starting FastMCP Server on {host}:{port}")
-    print("ℹ️  Authentication disabled for testing")
+    if auth_token:
+        print("🔒 Bearer token authentication enabled")
+    else:
+        print("⚠️  Authentication disabled - set FASTMCP_AUTH_TOKEN to enable")
     
     uvicorn.run(app, host=host, port=port)
