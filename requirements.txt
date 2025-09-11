@@ -1,0 +1,4 @@
+# FastMCP Requirements (Python 3.12+)
+fastmcp>=2.8.0
+uvicorn>=0.23.0
+httpx>=0.24.0
